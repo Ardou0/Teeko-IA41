@@ -8,6 +8,7 @@ class TeekoGame:
         self.phase = 'drop'  # Game starts in the drop phase
         self.turn_count = 0
         self.winner = None
+        self.win_patterns = self.generate_win_patterns()
         
     def get_board(self):
         """Return the current state of the board."""
@@ -92,34 +93,46 @@ class TeekoGame:
         """Switch the current player."""
         self.current_player = 'white' if self.current_player == 'black' else 'black'
 
+    def generate_win_patterns(self):
+        """Génère automatiquement les configurations gagnantes."""
+        win_patterns = []
+
+        # Alignements horizontaux
+        for row in range(5):
+            for col in range(2):
+                pattern = [row * 5 + col + i for i in range(4)]
+                win_patterns.append(pattern)
+
+        # Alignements verticaux
+        for row in range(2):
+            for col in range(5):
+                pattern = [row * 5 + col + i * 5 for i in range(4)]
+                win_patterns.append(pattern)
+
+        # Alignements diagonaux (de haut-gauche à bas-droite)
+        for row in range(2):
+            for col in range(2):
+                pattern = [row * 5 + col + i * 6 for i in range(4)]
+                win_patterns.append(pattern)
+
+        # Alignements diagonaux (de haut-droite à bas-gauche)
+        for row in range(2):
+            for col in range(3, 5):
+                pattern = [row * 5 + col + i * 4 for i in range(4)]
+                win_patterns.append(pattern)
+
+        # Carrés 2x2
+        for row in range(4):
+            for col in range(4):
+                pattern = [row * 5 + col, row * 5 + col + 1,
+                           (row + 1) * 5 + col, (row + 1) * 5 + col + 1]
+                win_patterns.append(pattern)
+        return win_patterns
+
     def check_win(self, player):
         """Check if the player has won by forming a line or a square."""
         # Check all possible lines and squares
-        win_patterns = [
-            # Horizontal lines
-            [0, 1, 2, 3], [1, 2, 3, 4],
-            [5, 6, 7, 8], [6, 7, 8, 9],
-            [10, 11, 12, 13], [11, 12, 13, 14],
-            [15, 16, 17, 18], [16, 17, 18, 19],
-            [20, 21, 22, 23], [21, 22, 23, 24],
-            
-            # Vertical lines
-            [0, 5, 10, 15], [5, 10, 15, 20],
-            [1, 6, 11, 16], [6, 11, 16, 21],
-            [2, 7, 12, 17], [7, 12, 17, 22],
-            [3, 8, 13, 18], [8, 13, 18, 23],
-            [4, 9, 14, 19], [9, 14, 19, 24],
-            
-            # Diagonal lines
-            [0, 6, 12, 18], [6, 12, 18, 24],
-            [1, 7, 13, 19], [5, 11, 17, 23],
-            
-            # Squares
-            [0, 1, 5, 6], [1, 2, 6, 7], [2, 3, 7, 8], [3, 4, 8, 9],
-            [5, 6, 10, 11], [6, 7, 11, 12], [7, 8, 12, 13], [8, 9, 13, 14],
-            [10, 11, 15, 16], [11, 12, 16, 17], [12, 13, 17, 18], [13, 14, 18, 19],
-            [15, 16, 20, 21], [16, 17, 21, 22], [17, 18, 22, 23], [18, 19, 23, 24]
-        ]
+        win_patterns = self.win_patterns
 
         for pattern in win_patterns:
             if all(self.board[pos] == player for pos in pattern):

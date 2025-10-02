@@ -1,29 +1,22 @@
 from game_engine import TeekoGame
+from ai_template import TeekoAI
 
 def main():
     # Créer une instance du jeu
     game = TeekoGame()
-
-    # Exemple de pose de pions
-    game.drop_piece(0)  
-    print(f"Plateau après le premier tour : {game.get_board()}")
-    print(f"Joueur actuel : {game.get_current_player()}")
-
-    game.drop_piece(2) 
-    print(f"Plateau après le deuxième tour : {game.get_board()}")
-    print(f"Joueur actuel : {game.get_current_player()}")
-    game.drop_piece(1)     
-    game.drop_piece(3)      
-    game.drop_piece(5)     
-    game.drop_piece(7) 
-    game.drop_piece(8)     
-    game.drop_piece(8) # Essayer de poser sur une position occupée (devrait échouer)
-    
-    # game.move_piece(from_position=0, to_position=1) 
-    # Afficher l'état du jeu
-    print(f"Phase actuelle : {game.get_phase()}")
-    print(f"Nombre de tours joués : {game.get_turn_count()}")
-    print(f"Gagnant actuel : {game.get_winner()}")
+    ai1 = TeekoAI(game, "black", 1)
+    ai2 = TeekoAI(game, "white", "teacher")
+    print("Jeu Teeko initialisé.")
+    while game.get_winner() is None:
+        ai1.make_move()
+        ai2.last_opponent_move = ai1.last_move
+        ai2.make_move()
+        ai1.last_opponent_move = ai2.last_move
+    if game.get_winner() == "black":
+        print(f"Le gagnant est: Ai1")
+    if game.get_winner() == "white":
+        print(f"Le gagnant est: Ai2")
+    print(game.get_board())  # Afficher l'état actuel du plateau
 
 if __name__ == "__main__":
     main()
