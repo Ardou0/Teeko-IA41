@@ -10,6 +10,14 @@ class TeekoGame:
         self.winner = None
         self.win_patterns = self.generate_win_patterns()
         
+    def reset(self):
+        """Reset the game to the initial state."""
+        self.board = [None] * 25
+        self.current_player = 'black'
+        self.phase = 'drop'
+        self.turn_count = 0
+        self.winner = None
+        
     def get_board(self):
         """Return the current state of the board."""
         return self.board
@@ -37,6 +45,10 @@ class TeekoGame:
     def is_position_free(self, position):
         """Check if the position is free on the board."""
         return self.board[position] is None
+    
+    def is_game_over(self):
+        """Check if the game is over."""
+        return self.winner is not None
 
     def drop_piece(self, position):
         """Drop a piece on the board during the drop phase."""

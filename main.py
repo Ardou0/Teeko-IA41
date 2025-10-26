@@ -1,5 +1,6 @@
 from game_engine import TeekoGame
 from ai_template import TeekoAI
+from ai_agent import TeekoRLAgent
 
 def main():
     # Créer une instance du jeu
@@ -17,6 +18,9 @@ def main():
     if game.get_winner() == "white":
         print(f"Le gagnant est: Ai2")
     print(game.get_board())  # Afficher l'état actuel du plateau
+
+
+
 
 if __name__ == "__main__":
     main()
