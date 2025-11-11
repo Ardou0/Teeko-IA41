@@ -2,10 +2,35 @@ import random
 
 class TeekoAI:
     def __init__(self, game_engine, who, difficulty=3):
+
         self.game_engine = game_engine
-        self.base_difficulty = difficulty
-        self.adaptatif = (difficulty == "teacher")
         self.who_am_i = who
+        # Normalisation de la difficulté
+        # - "teacher" => mode adaptatif
+        # - "standard" ou entier => mode non adaptatif avec base_difficulty numérique
+        self.adaptatif = False
+        if isinstance(difficulty, str):
+            d = difficulty.strip().lower()
+            if d == "teacher":
+                self.adaptatif = True
+                # Valeur arbitraire non utilisée en mode adaptatif, mais on la définit proprement
+                self.base_difficulty = 4
+            elif d == "standard":
+                self.base_difficulty = 2
+            else:
+                # Si la chaîne représente un nombre, on convertit
+                try:
+                    self.base_difficulty = max(1, int(d))
+                except ValueError:
+                    # Valeur par défaut sûre
+                    self.base_difficulty = 2
+        else:
+            # Entier fourni
+            try:
+                self.base_difficulty = max(1, int(difficulty))
+            except Exception:
+                self.base_difficulty = 2
+
         self.last_opponent_move = None
         self.last_move = None
         self.last_moves = []  # Pour éviter les répétitions
@@ -171,12 +196,20 @@ class TeekoAI:
     def adaptive_depth(self, board):
         """Calcule la profondeur de recherche en fonction de la difficulté."""
         if not self.adaptatif:
-            return max(1, self.base_difficulty - 1)  # Profondeur très faible pour l'IA standard
+            # Sécuriser la conversion en entier
+            try:
+                bd = max(1, int(self.base_difficulty))
+            except Exception:
+                bd = 2
+            # Profondeur simple et légère pour le mode standard
+            return max(1, bd - 1)
         else:
+            # Mode "teacher" : profondeur plus élevée et adaptative
             possible_moves = len(self.get_all_possible_moves(board, self.who_am_i))
-            depth = min(6, 5 + (8 - possible_moves // 2))  # Profondeur bien plus élevée pour "teacher"
-            print(f"Profondeur de recherche pour {self.who_am_i} (mode {'teacher' if self.adaptatif else 'standard'}): {depth}")
+            depth = min(5, 5 + (8 - possible_moves // 2))  # borne supérieure 5
+            print(f"Profondeur de recherche pour {self.who_am_i} (mode teacher): {depth}")
             return depth
+
 
     def choose_best_move(self):
         """Choisit le meilleur coup avec une priorité aux blocages et opportunités en mode 'teacher'."""
