@@ -1,35 +1,42 @@
 import random
 
 class TeekoAI:
-    def __init__(self, game_engine, who, difficulty=3):
+    def __init__(self, game_engine, who, difficulty="Normal"):
 
         self.game_engine = game_engine
         self.who_am_i = who
-        # Normalisation de la difficulté
-        # - "teacher" => mode adaptatif
-        # - "standard" ou entier => mode non adaptatif avec base_difficulty numérique
-        self.adaptatif = False
+        
+        # Nouveaux niveaux avec expert = mode adaptatif
+        level_config = {
+            "Débutant": (1, False),    # profondeur 1, non adaptatif
+            "Normal": (2, False),      # profondeur 2, non adaptatif  
+            "Pro": (4, False),         # profondeur 4, non adaptatif
+            "Expert": (5, True)        # profondeur 5, adaptatif ACTIVÉ
+        }
+        
         if isinstance(difficulty, str):
-            d = difficulty.strip().lower()
-            if d == "teacher":
-                self.adaptatif = True
-                # Valeur arbitraire non utilisée en mode adaptatif, mais on la définit proprement
-                self.base_difficulty = 4
-            elif d == "standard":
-                self.base_difficulty = 2
+            diff = difficulty.strip().lower()
+            if diff in level_config:
+                depth, adaptatif = level_config[diff]
+                self.base_difficulty = depth
+                self.adaptatif = adaptatif
             else:
-                # Si la chaîne représente un nombre, on convertit
+                # Fallback pour nombres en chaîne
                 try:
-                    self.base_difficulty = max(1, int(d))
+                    self.base_difficulty = max(1, min(5, int(diff)))
+                    self.adaptatif = False
                 except ValueError:
-                    # Valeur par défaut sûre
+                    # Défaut = normal
                     self.base_difficulty = 2
+                    self.adaptatif = False
         else:
-            # Entier fourni
+            # Entier = non adaptatif
             try:
-                self.base_difficulty = max(1, int(difficulty))
+                self.base_difficulty = max(1, min(5, int(difficulty)))
+                self.adaptatif = False
             except Exception:
                 self.base_difficulty = 2
+                self.adaptatif = False
 
         self.last_opponent_move = None
         self.last_move = None
@@ -37,12 +44,12 @@ class TeekoAI:
         self.max_repetitions = 2  # Limite de répétitions autorisées
 
     def evaluate_board(self, board):
-        """Évalue l'état du plateau avec une stratégie plus agressive en mode 'teacher'."""
-        opponent = 'white' if self.who_am_i == 'black' else 'black'
+        """Évalue l'état du plateau avec une stratégie plus agressive en mode 'expert'."""
+        opponent = 'red' if self.who_am_i == 'black' else 'black'
         win_patterns = self.game_engine.win_patterns
         score = 0
 
-        # Vérifier les répétitions (uniquement en mode "teacher")
+        # Vérifier les répétitions (uniquement en mode "expert")
         if self.adaptatif:
             current_move = tuple(board)
             if self.last_moves.count(current_move) >= self.max_repetitions:
@@ -55,7 +62,7 @@ class TeekoAI:
             if all(board[pos] == opponent for pos in pattern):
                 return -1000
 
-        # En mode standard, l'IA est moins réactive
+        # En mode debutant, normal, pro, l'IA est moins réactive
         if not self.adaptatif:
             for pattern in win_patterns:
                 my_pieces = sum(1 for pos in pattern if board[pos] == self.who_am_i)
@@ -64,14 +71,14 @@ class TeekoAI:
                 if my_pieces == 3:
                     score += 500
                 elif my_pieces == 2:
-                    score += 50  # Moins que l'IA "teacher"
-                # L'IA standard ignore les motifs à 1 pion
+                    score += 50  # Moins que l'IA "expert"
+                # L'IA débutant, normal, pro, ignore les motifs à 1 pion
 
                 if opp_pieces == 3:
                     score -= 500  # Moins pénalisant
-                # L'IA standard ignore les motifs à 2 pions de l'adversaire
+                # L'IA débutant, normal, pro ignore les motifs à 2 pions de l'adversaire
         else:
-            # Logique complète pour l'IA "teacher"
+            # Logique complète pour l'IA "expert"
             # Analyser le dernier coup de l'adversaire
             if self.last_opponent_move is not None:
                 last_move_type, *last_move_positions = self.last_opponent_move
@@ -109,13 +116,13 @@ class TeekoAI:
                 elif opp_pieces == 1 and my_pieces == 0:
                     score -= 20
 
-        # Récompenser les opportunités de victoire immédiate (plus en mode "teacher")
+        # Récompenser les opportunités de victoire immédiate (plus en mode "expert")
         for pattern in win_patterns:
             my_pieces = sum(1 for pos in pattern if board[pos] == self.who_am_i)
             if my_pieces == 3:
                 score += 2000 if self.adaptatif else 1000
 
-        # En mode "teacher", récompenser les coups qui forcent l'adversaire à se défendre
+        # En mode "expert", récompenser les coups qui forcent l'adversaire à se défendre
         if self.adaptatif:
             for pattern in win_patterns:
                 my_pieces = sum(1 for pos in pattern if board[pos] == self.who_am_i)
@@ -143,7 +150,7 @@ class TeekoAI:
             return best_value
         else:
             best_value = float('inf')
-            opponent = 'white' if self.who_am_i == 'black' else 'black'
+            opponent = 'red' if self.who_am_i == 'black' else 'black'
             for move in self.get_all_possible_moves(board, opponent):
                 new_board = self.simulate_move(board, move, opponent)
                 value = self.minimax(new_board, depth - 1, alpha, beta, True)
@@ -195,31 +202,51 @@ class TeekoAI:
 
     def adaptive_depth(self, board):
         """Calcule la profondeur de recherche en fonction de la difficulté."""
+        # Détecter la phase (drop ou move)
+        total_pieces = sum(1 for pos in range(25) if board[pos] is not None)
+        is_drop_phase = total_pieces < 8
+        
         if not self.adaptatif:
-            # Sécuriser la conversion en entier
-            try:
-                bd = max(1, int(self.base_difficulty))
-            except Exception:
-                bd = 2
-            # Profondeur simple et légère pour le mode standard
-            return max(1, bd - 1)
+            # Mode débutant, normal, pro : profondeur réduite en phase de drop
+            base_depth = self.base_difficulty
+            
+            if is_drop_phase:
+                # Réduction significative en phase de drop
+                if base_depth >= 4:  # Pro
+                    depth = 2
+                elif base_depth == 2:  # Normal
+                    depth = 1
+                else:  # Débutant
+                    depth = 1
+            else:
+                # Phase move : profondeur normale
+                depth = base_depth
+            return depth
         else:
-            # Mode "teacher" : profondeur plus élevée et adaptative
+            # Mode expert : profondeur adaptative 
             possible_moves = len(self.get_all_possible_moves(board, self.who_am_i))
-            depth = min(5, 5 + (8 - possible_moves // 2))  # borne supérieure 5
-            print(f"Profondeur de recherche pour {self.who_am_i} (mode teacher): {depth}")
+            depth = min(5, 5 + (8 - possible_moves // 2))
+            
+            # Réduire la profondeur en phase de drop
+            if is_drop_phase:
+                if total_pieces < 4:  # Tout début
+                    depth = 2
+                else:  # Fin de phase drop
+                    depth = 3
+                     
+            print(f"Profondeur de recherche pour {self.who_am_i} (expert): {depth}")
             return depth
 
 
     def choose_best_move(self):
-        """Choisit le meilleur coup avec une priorité aux blocages et opportunités en mode 'teacher'."""
+        """Choisit le meilleur coup avec une priorité aux blocages et opportunités en mode 'expert'."""
         board = self.game_engine.get_board()
         depth = self.adaptive_depth(board)
         best_value = float('-inf')
         best_moves = []
-        opponent = 'white' if self.who_am_i == 'black' else 'black'
+        opponent = 'red' if self.who_am_i == 'black' else 'black'
 
-        # En mode standard, ajouter une perturbation aléatoire
+        # En mode débutant, normal, pro, ajouter une perturbation aléatoire
         if not self.adaptatif:
             all_moves = self.get_all_possible_moves(board, self.who_am_i)
             if all_moves:
@@ -262,11 +289,11 @@ class TeekoAI:
                                 if move is not None and move not in urgent_moves:
                                     urgent_moves.append(move)
 
-        # En mode "teacher", ignorer les blocages dans 30% des cas pour forcer des erreurs chez l'adversaire
+        # En mode "expert", ignorer les blocages dans 30% des cas pour forcer des erreurs chez l'adversaire
         if self.adaptatif and urgent_moves and random.random() < 0.3:
             urgent_moves = []  # Ignorer les blocages aléatoirement pour créer des opportunités
 
-        # En mode "teacher", évaluer d'abord les coups urgents
+        # En mode "expert", évaluer d'abord les coups urgents
         if self.adaptatif and urgent_moves:
             for move in urgent_moves:
                 new_board = self.simulate_move(board, move, self.who_am_i)
@@ -287,7 +314,7 @@ class TeekoAI:
                 elif move_value == best_value:
                     best_moves.append(move)
 
-        # En mode "teacher", éviter les répétitions
+        # En mode "expert", éviter les répétitions
         if self.adaptatif and best_moves:
             filtered_moves = []
             for move in best_moves:
@@ -298,20 +325,42 @@ class TeekoAI:
 
         return random.choice(best_moves) if best_moves else None
 
+    def get_difficulty_name(self):
+        """Retourne le nom du niveau de difficulté."""
+        level_names = {
+            1: "Débutant",
+            2: "Normal", 
+            4: "Pro",
+            5: "Expert"
+        }
+        
+        if self.adaptatif:
+            return "Expert"
+        else:
+            return level_names.get(self.base_difficulty, f"niveau {self.base_difficulty}")
+
     def make_move(self):
         """Effectue le meilleur coup et met à jour l'historique."""
         best_move = self.choose_best_move()
+        
         if best_move is not None:
             self.last_move = best_move
+            
+            # Exécuter le coup sur le moteur de jeu
             if best_move[0] == 'drop':
                 self.game_engine.drop_piece(best_move[1])
             elif best_move[0] == 'move':
                 self.game_engine.move_piece(best_move[1], best_move[2])
 
-            # Enregistrer le plateau actuel pour éviter les répétitions (en mode "teacher")
+            # Enregistrer le plateau actuel pour éviter les répétitions (uniquement en mode expert)
             if self.adaptatif:
-                self.last_moves.append(tuple(self.game_engine.get_board()))
-                if len(self.last_moves) > 3:  # Garder seulement les 3 derniers coups
+                current_board = tuple(self.game_engine.get_board())
+                self.last_moves.append(current_board)
+                if len(self.last_moves) > 3:
                     self.last_moves.pop(0)
 
-        print(f"IA ({self.who_am_i} - {'teacher' if self.adaptatif else 'standard'}) a joué: {best_move}")
+        # Affichage comme avant
+        niveau = self.get_difficulty_name()
+        print(f"IA ({self.who_am_i} - {niveau}) a joué: {best_move}")
+            
+        return best_move

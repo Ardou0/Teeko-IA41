@@ -103,7 +103,7 @@ class TeekoGame:
 
     def switch_player(self):
         """Switch the current player."""
-        self.current_player = 'white' if self.current_player == 'black' else 'black'
+        self.current_player = 'red' if self.current_player == 'black' else 'black'
 
     def generate_win_patterns(self):
         """Génère automatiquement les configurations gagnantes."""
@@ -155,7 +155,7 @@ class TeekoGame:
 # Example usage:
 # game = TeekoGame()
 # game.drop_piece(0)  # Black drops a piece at position 0
-# game.drop_piece(1)  # White drops a piece at position 1
+# game.drop_piece(1)  # red drops a piece at position 1
 # game.move_piece(from_position, to_position)  # Move a piece during the move phase
 
 TeekoGame
