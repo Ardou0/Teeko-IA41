@@ -216,6 +216,17 @@ class GameScreen(tk.Frame):
         self.options = options
         self.selected_from = None
         self.aborted = False
+        
+        # Supprimer TOUS les boutons existants
+        for widget in self.winfo_children():
+            if isinstance(widget, tk.Button) or (isinstance(widget, tk.Frame) and any(isinstance(child, tk.Button) for child in widget.winfo_children())):
+                widget.destroy()
+        
+        # Recréer le bouton Abandonner
+        tk.Button(self, text="Abandonner", command=self.abort,
+                bg="#3E2D2D", fg="white", activebackground="#5A4444", 
+                activeforeground="white", font=("Helvetica", 12, "bold")).pack(pady=10)
+        
         self.refresh()
 
     #Au début de partie va regarder si c'est le tour d'une ia et la faire jouer si c'est le cas
@@ -294,12 +305,12 @@ class GameScreen(tk.Frame):
         # APPELER print_winner_info pour afficher dans la console
         self.print_winner_info(winner)
         
-        # Supprimer TOUS les boutons existants (Abandonner et éventuels boutons de fin)
+        # Supprimer TOUS les boutons existants
         for widget in self.winfo_children():
             if isinstance(widget, tk.Button):
                 widget.destroy()
         
-        # Créer un frame pour les nouveaux boutons
+        # Créer les boutons de fin (uniquement en fin de partie)
         button_frame = tk.Frame(self, bg="#FFEEE0")
         button_frame.pack(pady=10)
         
