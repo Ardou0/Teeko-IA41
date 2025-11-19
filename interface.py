@@ -7,7 +7,8 @@ class App(tk.Tk):
         super().__init__()
         self.title("Teeko")
         self.geometry("385x600")
-        self.container = tk.Frame(self)
+        self.configure(bg="#FFEEE0")
+        self.container = tk.Frame(self, bg = "#FFEEE0")
         self.container.pack(fill="both", expand=True)
         self.screens = {}
         for Screen in (StartScreen, GameScreen):
@@ -40,6 +41,9 @@ class App(tk.Tk):
         
         mode = options["mode"]
         who_starts = options["who_starts"]
+
+        # Conversion "Noir"/"Rouge" en "black"/"red"
+        who_starts_color = "black" if who_starts == "Noir" else "red"
         
         # Instanciation des IA avec les bons niveaux
         if mode == "Humain vs IA":
@@ -54,7 +58,7 @@ class App(tk.Tk):
             pass
 
         # Forcer le starter si différent de 'black'
-        if who_starts == "red" and self.game.get_current_player() != "red":
+        if who_starts_color == "red" and self.game.get_current_player() != "red":
             self.game.switch_player()
 
         # Lancer l'écran de jeu
@@ -65,48 +69,84 @@ class App(tk.Tk):
 
 class StartScreen(tk.Frame):
     def __init__(self, parent, app: App):
-        super().__init__(parent)
+        super().__init__(parent, bg = "#FFEEE0")
         self.app = app
-        tk.Label(self, text="Teeko - Choix du mode", font=("Arial", 16)).pack(pady=12)
+        # Frame vide pour créer de l'espace en haut
+        tk.Frame(self, height=20, bg="#FFEEE0").pack()
+        tk.Label(self, text="Teeko - Choix du mode", font=("Helvetica", 16, "bold"), bg = "#FFEEE0").pack(pady=20)
 
         # Conteneur pour centrer tous les éléments
-        self.main_container = tk.Frame(self)
+        self.main_container = tk.Frame(self, bg = "#FFEEE0")
         self.main_container.pack(pady = 20)
 
         # Mode de jeu
         self.mode = tk.StringVar(value="Humain vs IA")
-        tk.Label(self, text="Mode de jeu").pack()
-        tk.OptionMenu(self, self.mode, "Humain vs IA", "IA vs IA", "Humain vs Humain").pack(pady=4)
+        tk.Label(self, text="Mode de jeu", bg = "#FFEEE0", font=("Helvetica", 11, "bold")).pack()
+        mode_menu = tk.OptionMenu(self, self.mode, "Humain vs IA", "IA vs IA", "Humain vs Humain")
+        self.configure_option_menu(mode_menu)
+        mode_menu.pack(pady=4)
 
         # Qui commence
-        self.who_starts = tk.StringVar(value="black")
-        tk.Label(self, text="Qui commence ?").pack()
-        tk.OptionMenu(self, self.who_starts, "black", "red").pack(pady=4)
+        self.who_starts = tk.StringVar(value="Noir")
+        tk.Label(self, text="Qui commence ?", bg = "#FFEEE0", font=("Helvetica", 11, "bold")).pack()
+        who_menu = tk.OptionMenu(self, self.who_starts, "Noir", "Rouge")
+        self.configure_option_menu(who_menu)
+        who_menu.pack(pady=4)
 
         # Niveaux IA avec les nouveaux choix
         self.red_level = tk.StringVar(value="Normal")
         self.black_level = tk.StringVar(value="Normal")
         
         # Frame pour IA Rouge
-        self.red_frame = tk.Frame(self)
-        tk.Label(self.red_frame, text="Niveau IA rouge").pack(side="left")
+        self.red_frame = tk.Frame(self, bg = "#FFEEE0")
+        tk.Label(self.red_frame, text="Niveau IA rouge", bg = "#FFEEE0", font=("Helvetica", 11, "bold")).pack(side="left")
         # Ajout des nouveaux niveaux
-        tk.OptionMenu(self.red_frame, self.red_level, 
-                     "Débutant", "Normal", "Pro", "Expert").pack(side="left")
+        red_menu = tk.OptionMenu(self.red_frame, self.red_level, 
+                     "Débutant", "Normal", "Pro", "Expert")
+        self.configure_option_menu(red_menu)
+        red_menu.pack(side="left")
         
         # Frame pour IA Noire  
-        self.black_frame = tk.Frame(self)
-        tk.Label(self.black_frame, text="Niveau IA noire").pack(side="left")
-        tk.OptionMenu(self.black_frame, self.black_level, 
-                     "Débutant", "Normal", "Pro", "Expert").pack(side="left")
+        self.black_frame = tk.Frame(self, bg = "#FFEEE0")
+        tk.Label(self.black_frame, text="Niveau IA noire", bg = "#FFEEE0",font=("Helvetica", 11, "bold")).pack(side="left")
+        black_menu = tk.OptionMenu(self.black_frame, self.black_level, 
+                     "Débutant", "Normal", "Pro", "Expert")
+        black_menu.pack(side="left")
+        self.configure_option_menu(black_menu)
 
         # # Bouton en dernier
-        self.launch_btn = tk.Button(self, text="Lancer la partie", command=self.launch)
+        self.launch_btn = tk.Button(self, text="Lancer la partie", command=self.launch,
+                                   bg="#3E2D2D", fg="white", activebackground="#5A4444", 
+                                   activeforeground="white", font=("Helvetica", 12, "bold"))
         self.launch_btn.pack(pady=16)
 
         # Configuration initiale
         self.refresh_display()
         self.mode.trace_add("write", lambda *_: self.refresh_display())
+
+    def configure_option_menu(self, menu):
+        """Configure complètement un OptionMenu."""
+        menu.config(
+            bg="#3E2D2D", 
+            fg="white", 
+            activebackground="#5A4444", 
+            activeforeground="white",
+            width=12,  # Largeur fixe pour uniformité
+            font=("Helvetica", 10, "bold")
+        )
+        
+        # Menu déroulant
+        try:
+            dropdown = menu.nametowidget(menu.menuname)
+            dropdown.config(
+                bg="#3E2D2D",
+                fg="white", 
+                activebackground="#5A4444",
+                activeforeground="white",
+                font=("Helvetica", 10, "bold")
+            )
+        except:
+            pass  # Si ça ne fonctionne pas, on ignore
 
     def refresh_display(self):
         self.red_frame.pack_forget()
@@ -130,7 +170,7 @@ class StartScreen(tk.Frame):
 
 class GameScreen(tk.Frame):
     def __init__(self, parent, app: App):
-        super().__init__(parent)
+        super().__init__(parent, bg="#FFEEE0") 
         self.app = app
         self.game = None
         self.ai_black = None
@@ -139,11 +179,14 @@ class GameScreen(tk.Frame):
         self.selected_from = None
         self.aborted = False  # Flag d'arrêt
 
-        self.status = tk.Label(self, text="Prêt", font=("Arial", 14))
+        # Frame vide pour créer de l'espace en haut
+        tk.Frame(self, height=20, bg="#FFEEE0").pack()
+
+        self.status = tk.Label(self, text="Prêt", font=("Helvetica", 14, "bold"), bg = "#FFEEE0")
         self.status.pack(pady=8)
 
         # Conteneur pour centrer le plateau
-        self.center_container = tk.Frame(self)
+        self.center_container = tk.Frame(self, bg = "#FFEEE0")
         self.center_container.pack(expand=True, fill="both")
         
         # Plateau centrée
@@ -155,13 +198,16 @@ class GameScreen(tk.Frame):
         for i in range(5):
             row = []
             for j in range(5):
-                b = tk.Button(self.board_frame, text="", width=5, height=2, font=("Arial", 14),
-                              command=lambda r=i, c=j: self.on_click(r, c))
+                b = tk.Button(self.board_frame, text="", width=5, height=2, font=("Helvetica", 14),
+                              command=lambda r=i, c=j: self.on_click(r, c),
+                              bg="#3E2D2D", fg="white", activebackground="#5A4444", relief="raised", bd=2)
                 b.grid(row=i, column=j, padx = 6, pady = 6)
                 row.append(b)
             self.buttons.append(row)
 
-        tk.Button(self, text="Abandonner", command=self.abort).pack(pady=10)
+        tk.Button(self, text="Abandonner", command=self.abort,
+                 bg="#3E2D2D", fg="white", activebackground="#5A4444", 
+                 activeforeground="white", font=("Helvetica", 12, "bold")).pack(pady=10)
 
     def bind_runtime(self, game, ai_black, ai_red, options):
         self.game = game
@@ -248,23 +294,22 @@ class GameScreen(tk.Frame):
         # APPELER print_winner_info pour afficher dans la console
         self.print_winner_info(winner)
         
-        # Supprimer l'ancien bouton "Abandonner"
+        # Supprimer TOUS les boutons existants (Abandonner et éventuels boutons de fin)
         for widget in self.winfo_children():
-            if isinstance(widget, tk.Button) and widget.cget("text") == "Abandonner":
+            if isinstance(widget, tk.Button):
                 widget.destroy()
-                break
         
         # Créer un frame pour les nouveaux boutons
-        button_frame = tk.Frame(self)
+        button_frame = tk.Frame(self, bg="#FFEEE0")
         button_frame.pack(pady=10)
         
-        # Bouton Rejouer
         tk.Button(button_frame, text="Rejouer", command=self.replay, 
-                font=("Arial", 12), width=8).pack(side="left", padx=10)
+                font=("Helvetica", 12, "bold"), width=8,
+                bg="#3E2D2D", fg="white", activebackground="#5A4444").pack(side="left", padx=10)
         
-        # Bouton Quitter
         tk.Button(button_frame, text="Quitter", command=self.app.destroy,
-                font=("Arial", 12), width=8).pack(side="left", padx=10)
+                font=("Helvetica", 12, "bold"), width=8,
+                bg="#3E2D2D", fg="white", activebackground="#5A4444").pack(side="left", padx=10)
         
         self.refresh()
 
@@ -318,11 +363,11 @@ class GameScreen(tk.Frame):
             for j in range(5):
                 v = board[i*5 + j]
                 if v == "black":
-                    self.buttons[i][j].config(text="●", fg="black", bg="white")
+                    self.buttons[i][j].config(text="⬤", fg="black", bg="#5A4444")
                 elif v == "red":
-                    self.buttons[i][j].config(text="●", fg="red", bg="white")
+                    self.buttons[i][j].config(text="⬤", fg="red", bg="#5A4444")
                 else:
-                    self.buttons[i][j].config(text="", bg="white")
+                    self.buttons[i][j].config(text="", bg="#5A4444")
         if self.game and not self.game.is_game_over():
             cur = self.game.get_current_player()
             if (cur == "black" and self.ai_black) or (cur == "red" and self.ai_red):
