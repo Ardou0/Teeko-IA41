@@ -1,42 +1,30 @@
 import random
 
 class TeekoAI:
-    def __init__(self, game_engine, who, difficulty="Normal"):
-
+    def __init__(self, game_engine, who, difficulty="2"):
         self.game_engine = game_engine
         self.who_am_i = who
         
-        # Nouveaux niveaux avec expert = mode adaptatif
-        level_config = {
-            "Débutant": (1, False),    # profondeur 1, non adaptatif
-            "Normal": (2, False),      # profondeur 2, non adaptatif  
-            "Pro": (4, False),         # profondeur 4, non adaptatif
-            "Expert": (5, True)        # profondeur 5, adaptatif ACTIVÉ
-        }
-        
+        # Gestion simplifiée et directe
         if isinstance(difficulty, str):
-            diff = difficulty.strip().lower()
-            if diff in level_config:
-                depth, adaptatif = level_config[diff]
-                self.base_difficulty = depth
-                self.adaptatif = adaptatif
-            else:
-                # Fallback pour nombres en chaîne
-                try:
-                    self.base_difficulty = max(1, min(5, int(diff)))
-                    self.adaptatif = False
-                except ValueError:
-                    # Défaut = normal
-                    self.base_difficulty = 2
-                    self.adaptatif = False
+            diff = difficulty.strip()
+            try:
+                level = int(diff)
+                self.base_difficulty = max(1, min(5, level))
+                # Expert (niveau 5) = adaptatif activé
+                self.adaptatif = (level == 5)
+            except ValueError:
+                self.base_difficulty = 2
+                self.adaptatif = False
         else:
-            # Entier = non adaptatif
             try:
                 self.base_difficulty = max(1, min(5, int(difficulty)))
-                self.adaptatif = False
+                self.adaptatif = (int(difficulty) == 5)
             except Exception:
                 self.base_difficulty = 2
                 self.adaptatif = False
+
+        print(f"DEBUG - base_difficulty: {self.base_difficulty}, adaptatif: {self.adaptatif}")
 
         self.last_opponent_move = None
         self.last_move = None
@@ -346,21 +334,27 @@ class TeekoAI:
         if best_move is not None:
             self.last_move = best_move
             
-            # Exécuter le coup sur le moteur de jeu
+            # Exécuter le coup sur le moteur de jeu (garder les positions 0-24 pour l'exécution)
             if best_move[0] == 'drop':
                 self.game_engine.drop_piece(best_move[1])
             elif best_move[0] == 'move':
                 self.game_engine.move_piece(best_move[1], best_move[2])
 
-            # Enregistrer le plateau actuel pour éviter les répétitions (uniquement en mode expert)
+            # Créer une copie du best_move avec positions converties 0-24 → 1-25 pour l'affichage
+            if best_move[0] == 'drop':
+                display_move = ('drop', best_move[1] + 1)  # ← +1 ici
+            else:  # 'move'
+                display_move = ('move', best_move[1] + 1, best_move[2] + 1)  # ← +1 ici
+            
+            # Affichage avec positions 1-25
+            niveau = self.get_difficulty_name()
+            print(f"IA ({self.who_am_i} - {niveau}) a joué: {display_move}")
+
+            # Enregistrer le plateau actuel pour éviter les répétitions
             if self.adaptatif:
                 current_board = tuple(self.game_engine.get_board())
                 self.last_moves.append(current_board)
                 if len(self.last_moves) > 3:
                     self.last_moves.pop(0)
-
-        # Affichage comme avant
-        niveau = self.get_difficulty_name()
-        print(f"IA ({self.who_am_i} - {niveau}) a joué: {best_move}")
             
         return best_move

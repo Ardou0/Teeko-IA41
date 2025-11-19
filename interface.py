@@ -6,11 +6,11 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Teeko")
-        self.geometry("420x520")
+        self.geometry("385x600")
         self.container = tk.Frame(self)
         self.container.pack(fill="both", expand=True)
         self.screens = {}
-        for Screen in (StartScreen, GameScreen, EndScreen):
+        for Screen in (StartScreen, GameScreen):
             frame = Screen(self.container, self)
             self.screens[Screen.__name__] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -63,17 +63,15 @@ class App(tk.Tk):
         self.show("GameScreen")
         game_screen.kickoff_if_ai()
 
-    def finish_game(self, winner):
-        self.last_winner = winner
-        end: EndScreen = self.screens["EndScreen"]
-        end.set_winner(winner)
-        self.show("EndScreen")
-
 class StartScreen(tk.Frame):
     def __init__(self, parent, app: App):
         super().__init__(parent)
         self.app = app
         tk.Label(self, text="Teeko - Choix du mode", font=("Arial", 16)).pack(pady=12)
+
+        # Conteneur pour centrer tous les éléments
+        self.main_container = tk.Frame(self)
+        self.main_container.pack(pady = 20)
 
         # Mode de jeu
         self.mode = tk.StringVar(value="Humain vs IA")
@@ -102,7 +100,7 @@ class StartScreen(tk.Frame):
         tk.OptionMenu(self.black_frame, self.black_level, 
                      "Débutant", "Normal", "Pro", "Expert").pack(side="left")
 
-        # Bouton en dernier
+        # # Bouton en dernier
         self.launch_btn = tk.Button(self, text="Lancer la partie", command=self.launch)
         self.launch_btn.pack(pady=16)
 
@@ -116,10 +114,10 @@ class StartScreen(tk.Frame):
         
         mode = self.mode.get()
         if mode == "Humain vs IA":
-            self.red_frame.pack(pady=4, before=self.launch_btn)
+            self.red_frame.pack(pady=8, before=self.launch_btn)
         elif mode == "IA vs IA":
-            self.red_frame.pack(pady=4, before=self.launch_btn)
-            self.black_frame.pack(pady=4, before=self.launch_btn)
+            self.red_frame.pack(pady=8, before=self.launch_btn)
+            self.black_frame.pack(pady=8, before=self.launch_btn)
 
     def launch(self):
         options = {
@@ -144,15 +142,22 @@ class GameScreen(tk.Frame):
         self.status = tk.Label(self, text="Prêt", font=("Arial", 14))
         self.status.pack(pady=8)
 
-        self.board_frame = tk.Frame(self)
-        self.board_frame.pack()
+        # Conteneur pour centrer le plateau
+        self.center_container = tk.Frame(self)
+        self.center_container.pack(expand=True, fill="both")
+        
+        # Plateau centrée
+        self.board_frame = tk.Frame(self.center_container, bg="#E7BB66")
+        self.board_frame.pack(anchor="center", pady=30)
+
+
         self.buttons = []
         for i in range(5):
             row = []
             for j in range(5):
-                b = tk.Button(self.board_frame, text="", width=4, height=2, font=("Arial", 14),
+                b = tk.Button(self.board_frame, text="", width=5, height=2, font=("Arial", 14),
                               command=lambda r=i, c=j: self.on_click(r, c))
-                b.grid(row=i, column=j)
+                b.grid(row=i, column=j, padx = 6, pady = 6)
                 row.append(b)
             self.buttons.append(row)
 
@@ -186,6 +191,8 @@ class GameScreen(tk.Frame):
         pos = r * 5 + c
         if self.game.get_phase() == "drop":
             if self.game.drop_piece(pos):
+                # AFFICHER le coup humain
+                print(f"Humain ({cur}) a joué: ('drop', {pos + 1})")
                 self.post_move_flow()
         else:  # phase move
             if self.selected_from is None:
@@ -194,6 +201,8 @@ class GameScreen(tk.Frame):
                     self.status.config(text="Choisis la case d'arrivée")
             else:
                 if self.game.move_piece(self.selected_from, pos):
+                    # AFFICHER le coup humain
+                    print(f"Humain ({cur}) a joué: ('move', {self.selected_from}, {pos + 1})")
                     self.selected_from = None
                     self.post_move_flow()
                 else:
@@ -231,10 +240,68 @@ class GameScreen(tk.Frame):
 
     def finish(self):
         winner = self.game.get_winner()
-        self.app.finish_game(winner)
+        
+        # Afficher le message de victoire dans l'interface
+        nom = {"black": "Noir", "red": "Rouge"}.get(winner, str(winner))
+        self.status.config(text=f"Partie terminée ! Gagnant : {nom}")
+        
+        # APPELER print_winner_info pour afficher dans la console
+        self.print_winner_info(winner)
+        
+        # Supprimer l'ancien bouton "Abandonner"
+        for widget in self.winfo_children():
+            if isinstance(widget, tk.Button) and widget.cget("text") == "Abandonner":
+                widget.destroy()
+                break
+        
+        # Créer un frame pour les nouveaux boutons
+        button_frame = tk.Frame(self)
+        button_frame.pack(pady=10)
+        
+        # Bouton Rejouer
+        tk.Button(button_frame, text="Rejouer", command=self.replay, 
+                font=("Arial", 12), width=8).pack(side="left", padx=10)
+        
+        # Bouton Quitter
+        tk.Button(button_frame, text="Quitter", command=self.app.destroy,
+                font=("Arial", 12), width=8).pack(side="left", padx=10)
+        
+        self.refresh()
+
+    def print_winner_info(self, winner):
+        """Affiche dans la console le gagnant et la position des pions gagnants."""
+        print("=" * 50)
+        print(f"PARTIE TERMINÉE - GAGNANT : {winner.upper()}")
+        print("=" * 50)
+        
+        board = self.game.get_board()
+        win_patterns = self.game.win_patterns
+        
+        # Trouver le motif gagnant
+        winning_pattern = None
+        for pattern in win_patterns:
+            if all(board[pos] == winner for pos in pattern):
+                winning_pattern = pattern
+                break
+        
+        if winning_pattern:
+            print(f"Motif gagnant ({winner}) :")
+            # Afficher les coordonnées des pions gagnants
+            for pos in winning_pattern:
+                row, col = divmod(pos, 5)
+                print(f"  - Position {pos + 1} → Ligne {row + 1}, Colonne {col + 1}")
+        else:
+            print("Erreur : Impossible de trouver le motif gagnant")
+        
+        print("=" * 50)
+
+    def replay(self):
+        """Retourne au menu principal pour choisir une nouvelle configuration."""
+        self.app.show("StartScreen")
 
     def abort(self):
         """Arrête la partie et retourne au menu."""
+        print("Partie abandonnée")
         # Arrêter toutes les IA en cours
         self.aborted = True
         self.game = None
@@ -263,21 +330,6 @@ class GameScreen(tk.Frame):
             else:
                 self.status.config(text=f"À toi ({cur}) — phase {self.game.get_phase()}")
 
-class EndScreen(tk.Frame):
-    def __init__(self, parent, app: App):
-        super().__init__(parent)
-        self.app = app
-        self.label = tk.Label(self, text="Fin de partie", font=("Arial", 18))
-        self.label.pack(pady=16)
-        tk.Button(self, text="Rejouer", command=self.back_to_menu).pack(pady=8)
-        tk.Button(self, text="Quitter", command=self.app.destroy).pack(pady=8)
-
-    def set_winner(self, winner):
-        nom = {"black": "Noir", "red": "Rouge"}.get(winner, str(winner))
-        self.label.config(text=f"Gagnant : {nom}")
-
-    def back_to_menu(self):
-        self.app.show("StartScreen")
 
 if __name__ == "__main__":
     App().mainloop()
