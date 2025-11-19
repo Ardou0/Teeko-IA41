@@ -384,7 +384,7 @@ class GameScreen(tk.Frame):
             if (cur == "black" and self.ai_black) or (cur == "red" and self.ai_red):
                 self.status.config(text=f"Tour de l'IA ({cur})…")
             else:
-                self.status.config(text=f"À toi ({cur}) — phase {self.game.get_phase()}")
+                self.status.config(text=f"À toi ({cur}) — Phase {self.game.get_phase()}")
 
 
 if __name__ == "__main__":
