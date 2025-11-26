@@ -185,6 +185,9 @@ class GameScreen(tk.Frame):
         self.status = tk.Label(self, text="Prêt", font=("Helvetica", 14, "bold"), bg = "#FFEEE0")
         self.status.pack(pady=8)
 
+        self.move_count_label = tk.Label(self, text="Coups joués : 0", font=("Helvetica", 11), bg="#FFEEE0")
+        self.move_count_label.pack()
+
         # Conteneur pour centrer le plateau
         self.center_container = tk.Frame(self, bg = "#FFEEE0")
         self.center_container.pack(expand=True, fill="both")
@@ -216,6 +219,7 @@ class GameScreen(tk.Frame):
         self.options = options
         self.selected_from = None
         self.aborted = False
+        self.move_count = 0
         
         # Supprimer TOUS les boutons existants
         for widget in self.winfo_children():
@@ -269,6 +273,7 @@ class GameScreen(tk.Frame):
         
     #Verifie si c'est au tour d'une ia de jouer après un coup humain
     def post_move_flow(self):
+        self.move_count += 1
         if self.aborted:
             return
         if self.game.get_winner():
@@ -287,6 +292,7 @@ class GameScreen(tk.Frame):
         
         if ai:
             ai.make_move()
+            self.move_count += 1
             self.refresh()
             if self.game.get_winner():
                 self.finish()
@@ -385,7 +391,6 @@ class GameScreen(tk.Frame):
                 self.status.config(text=f"Tour de l'IA ({cur})…")
             else:
                 self.status.config(text=f"À toi ({cur}) — Phase {self.game.get_phase()}")
-
-
-if __name__ == "__main__":
-    App().mainloop()
+        
+        if hasattr(self, 'move_count_label'):
+            self.move_count_label.config(text=f"Coups joués : {self.move_count if hasattr(self, 'move_count') else 0}")

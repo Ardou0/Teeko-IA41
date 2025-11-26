@@ -151,11 +151,3 @@ class TeekoGame:
                 return True
 
         return False
-
-# Example usage:
-# game = TeekoGame()
-# game.drop_piece(0)  # Black drops a piece at position 0
-# game.drop_piece(1)  # red drops a piece at position 1
-# game.move_piece(from_position, to_position)  # Move a piece during the move phase
-
-TeekoGame

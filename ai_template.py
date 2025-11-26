@@ -1,4 +1,5 @@
 import random
+from history_analyzer import HistoryAnalyzer
 
 class TeekoAI:
     def __init__(self, game_engine, who, difficulty="2"):
@@ -31,94 +32,97 @@ class TeekoAI:
         self.last_moves = []  # Pour éviter les répétitions
         self.max_repetitions = 2  # Limite de répétitions autorisées
 
+        # Initialisation de l'analyseur d'historique
+        self.analyzer = HistoryAnalyzer()
+        self.move_history = []
+
+    def record_opponent_move(self, move):
+        """Enregistre le coup de l'adversaire et met à jour l'historique."""
+        if move is None:
+            return
+        self.last_opponent_move = move
+        opponent_color = 'red' if self.who_am_i == 'black' else 'black'
+        self.move_history.append({'move': move, 'player': opponent_color})
+
     def evaluate_board(self, board):
-        """Évalue l'état du plateau avec une stratégie plus agressive en mode 'expert'."""
+        """Évalue l'état du plateau en tenant compte du style de l'adversaire."""
         opponent = 'red' if self.who_am_i == 'black' else 'black'
         win_patterns = self.game_engine.win_patterns
         score = 0
 
-        # Vérifier les répétitions (uniquement en mode "expert")
-        if self.adaptatif:
-            current_move = tuple(board)
-            if self.last_moves.count(current_move) >= self.max_repetitions:
-                score -= 500  # Pénalité pour les répétitions
+        # --- Section d'analyse dynamique ---
+        aggression_factor = 1.0
+        fork_bonus_factor = 1.0
 
-        # Vérifier les victoires/défaites
+        if len(self.move_history) > 4: # On attend d'avoir assez de données
+            all_styles = self.analyzer.analyze_player_styles(self.move_history, win_patterns)
+            if all_styles:
+                opponent_style = all_styles.get(opponent)
+                if opponent_style:
+                    # Si l'adversaire est agressif, on devient plus prudent
+                    if opponent_style['offensive_ratio'] > 0.6:
+                        aggression_factor = 1.5
+                    # Si l'adversaire est défensif, on favorise les pièges
+                    if opponent_style['defensive_ratio'] > 0.6:
+                        fork_bonus_factor = 1.5
+
+        # --- Évaluation de base (valable pour tous les niveaux) ---
+
+        # Vérifier les victoires/défaites (score terminal)
         for pattern in win_patterns:
             if all(board[pos] == self.who_am_i for pos in pattern):
                 return 1000
             if all(board[pos] == opponent for pos in pattern):
                 return -1000
+        
+        # Pénalité pour répétitions (mode expert)
+        if self.adaptatif and tuple(board) in self.last_moves:
+            score -= 500
 
-        # En mode debutant, normal, pro, l'IA est moins réactive
-        if not self.adaptatif:
-            for pattern in win_patterns:
-                my_pieces = sum(1 for pos in pattern if board[pos] == self.who_am_i)
-                opp_pieces = sum(1 for pos in pattern if board[pos] == opponent)
+        # --- Évaluation unifiée des motifs ---
+        for pattern in win_patterns:
+            my_pieces = sum(1 for pos in pattern if board[pos] == self.who_am_i)
+            opp_pieces = sum(1 for pos in pattern if board[pos] == opponent)
 
-                if my_pieces == 3:
-                    score += 500
-                elif my_pieces == 2:
-                    score += 50  # Moins que l'IA "expert"
-                # L'IA débutant, normal, pro, ignore les motifs à 1 pion
+            if my_pieces > 0 and opp_pieces > 0:
+                continue # Ignorer les lignes sans avenir
 
-                if opp_pieces == 3:
-                    score -= 500  # Moins pénalisant
-                # L'IA débutant, normal, pro ignore les motifs à 2 pions de l'adversaire
-        else:
-            # Logique complète pour l'IA "expert"
-            # Analyser le dernier coup de l'adversaire
+            # Nos opportunités
+            if my_pieces == 3:
+                score += 500
+            elif my_pieces == 2:
+                # Bonus si c'est une fourche potentielle (2 cases vides)
+                if len([p for p in pattern if board[p] is None]) == 2:
+                    score += 50 * fork_bonus_factor
+                else:
+                    score += 25
+            elif my_pieces == 1:
+                score += 5
+
+            # Menaces adverses
+            if opp_pieces == 3:
+                score -= 500 * aggression_factor
+            elif opp_pieces == 2:
+                # Pénalité accrue si c'est une menace de fourche
+                if len([p for p in pattern if board[p] is None]) == 2:
+                    score -= 150 * aggression_factor
+                else:
+                    score -= 75 * aggression_factor
+            elif opp_pieces == 1:
+                score -= 5
+
+        # Bonus spécifiques au mode expert pour la réactivité
+        if self.adaptatif:
             if self.last_opponent_move is not None:
                 last_move_type, *last_move_positions = self.last_opponent_move
-                if last_move_type == 'drop':
-                    last_pos = last_move_positions[0]
-                elif last_move_type == 'move':
-                    last_pos = last_move_positions[1]
+                last_pos = last_move_positions[0] if last_move_type == 'drop' else last_move_positions[1]
 
                 for pattern in win_patterns:
                     if last_pos in pattern:
-                        opp_pieces_in_pattern = sum(1 for pos in pattern if board[pos] == opponent)
-                        my_pieces_in_pattern = sum(1 for pos in pattern if board[pos] == self.who_am_i)
-
-                        if opp_pieces_in_pattern == 3 and my_pieces_in_pattern == 0:
-                            score -= 2000  # Urgence absolue pour bloquer
-                        elif opp_pieces_in_pattern == 2 and my_pieces_in_pattern == 0:
-                            score -= 500  # Priorité très élevée
-
-            # Évaluer les motifs partiellement complétés
-            for pattern in win_patterns:
-                my_pieces = sum(1 for pos in pattern if board[pos] == self.who_am_i)
-                opp_pieces = sum(1 for pos in pattern if board[pos] == opponent)
-
-                if my_pieces == 3 and opp_pieces == 0:
-                    score += 1000
-                elif my_pieces == 2 and opp_pieces == 0:
-                    score += 200
-                elif my_pieces == 1 and opp_pieces == 0:
-                    score += 20
-
-                if opp_pieces == 3 and my_pieces == 0:
-                    score -= 1000
-                elif opp_pieces == 2 and my_pieces == 0:
-                    score -= 500
-                elif opp_pieces == 1 and my_pieces == 0:
-                    score -= 20
-
-        # Récompenser les opportunités de victoire immédiate (plus en mode "expert")
-        for pattern in win_patterns:
-            my_pieces = sum(1 for pos in pattern if board[pos] == self.who_am_i)
-            if my_pieces == 3:
-                score += 2000 if self.adaptatif else 1000
-
-        # En mode "expert", récompenser les coups qui forcent l'adversaire à se défendre
-        if self.adaptatif:
-            for pattern in win_patterns:
-                my_pieces = sum(1 for pos in pattern if board[pos] == self.who_am_i)
-                opp_pieces = sum(1 for pos in pattern if board[pos] == opponent)
-                empty_pos = [pos for pos in pattern if board[pos] is None]
-
-                if my_pieces == 2 and opp_pieces == 0 and len(empty_pos) == 2:
-                    score += 100  # Récompenser les "pièges"
+                        if sum(1 for p in pattern if board[p] == opponent) == 3:
+                            score -= 1000  # Urgence de blocage
+                        elif sum(1 for p in pattern if board[p] == opponent) == 2:
+                            score -= 250 # Priorité élevée
 
         return score
 
@@ -229,6 +233,51 @@ class TeekoAI:
     def choose_best_move(self):
         """Choisit le meilleur coup avec une priorité aux blocages et opportunités en mode 'expert'."""
         board = self.game_engine.get_board()
+        all_moves = self.get_all_possible_moves(board, self.who_am_i)
+
+        # Recherche d'un coup gagnant immédiat avant toute autre considération
+        for move in all_moves:
+            temp_board = self.simulate_move(board, move, self.who_am_i)
+            for pattern in self.game_engine.win_patterns:
+                if all(temp_board[pos] == self.who_am_i for pos in pattern):
+                    print(f"IA ({self.who_am_i}) a trouvé un coup gagnant immédiat : {move}")
+                    return move
+
+        # Recherche d'un blocage de victoire adverse immédiate
+        opponent = 'red' if self.who_am_i == 'black' else 'black'
+        opponent_moves = self.get_all_possible_moves(board, opponent)
+        blocking_moves = []
+        
+        opponent_win_positions = []
+        for opp_move in opponent_moves:
+            is_winning = False
+            temp_board = self.simulate_move(board, opp_move, opponent)
+            for pattern in self.game_engine.win_patterns:
+                if all(temp_board[pos] == opponent for pos in pattern):
+                    is_winning = True
+                    break
+            if is_winning:
+                # Déterminer la position cible du coup gagnant de l'adversaire
+                win_pos = opp_move[1] if opp_move[0] == 'drop' else opp_move[2]
+                if win_pos not in opponent_win_positions:
+                    opponent_win_positions.append(win_pos)
+        
+        # Si des positions de victoire adverse existent, trouver nos coups pour les bloquer
+        if opponent_win_positions:
+            for block_pos in opponent_win_positions:
+                for my_move in all_moves:
+                    # Déterminer la position cible de notre propre coup
+                    my_move_pos = my_move[1] if my_move[0] == 'drop' else my_move[2]
+                    if my_move_pos == block_pos:
+                        if my_move not in blocking_moves:
+                            blocking_moves.append(my_move)
+            
+            # S'il y a des coups de blocage possibles, en choisir un
+            if blocking_moves:
+                chosen_block = random.choice(blocking_moves)
+                print(f"IA ({self.who_am_i}) a trouvé un blocage nécessaire : {chosen_block}")
+                return chosen_block
+
         depth = self.adaptive_depth(board)
         best_value = float('-inf')
         best_moves = []
@@ -236,7 +285,6 @@ class TeekoAI:
 
         # En mode débutant, normal, pro, ajouter une perturbation aléatoire
         if not self.adaptatif:
-            all_moves = self.get_all_possible_moves(board, self.who_am_i)
             if all_moves:
                 # Choisir aléatoirement parmi les 3 meilleurs coups (au lieu du meilleur seul)
                 move_scores = []
@@ -332,6 +380,7 @@ class TeekoAI:
         best_move = self.choose_best_move()
         
         if best_move is not None:
+            self.move_history.append({'move': best_move, 'player': self.who_am_i})
             self.last_move = best_move
             
             # Exécuter le coup sur le moteur de jeu (garder les positions 0-24 pour l'exécution)
