@@ -3,49 +3,72 @@ from game_engine import TeekoGame
 from ai_template import TeekoAI
 
 class App(tk.Tk):
+    """
+    Classe principale de l'application, héritant de tk.Tk.
+    
+    Cette classe agit comme le contrôleur central qui gère les différents écrans 
+    (menu, jeu) et maintient l'état global de la partie (moteur de jeu, 
+    instances des IA).
+    """
     def __init__(self):
+        """
+        Initialise la fenêtre principale et les écrans de l'application.
+        """
         super().__init__()
         self.title("Teeko")
         self.geometry("385x600")
         self.configure(bg="#FFEEE0")
+        
         self.container = tk.Frame(self, bg = "#FFEEE0")
         self.container.pack(fill="both", expand=True)
+        
         self.screens = {}
         for Screen in (StartScreen, GameScreen):
             frame = Screen(self.container, self)
             self.screens[Screen.__name__] = frame
             frame.grid(row=0, column=0, sticky="nsew")
+        
         self.show("StartScreen")
 
-        # État partagé entre écrans
+        # État partagé entre les différents écrans de l'application
         self.game = None
         self.ai_black = None
         self.ai_red = None
         self.last_winner = None
 
     def show(self, name):
+        """
+        Affiche un écran spécifique au premier plan.
+
+        :param name: Le nom de la classe de l'écran à afficher.
+        :type name: str
+        """
         self.screens[name].tkraise()
 
     def new_game(self, options):
+        """
+        Configure et lance une nouvelle partie en fonction des options choisies.
+
+        Cette méthode initialise le moteur de jeu, configure les joueurs (humains 
+        ou IA avec le niveau de difficulté approprié) et bascule l'affichage 
+        vers l'écran de jeu.
+
+        :param options: Un dictionnaire contenant la configuration de la partie
+                        (mode, niveaux des IA, etc.).
+        :type options: dict
+        """
         self.game = TeekoGame()
         self.ai_black = None
         self.ai_red = None
         
-        # Conversion des niveaux texte → profondeur
         level_to_depth = {
-            "Débutant": 1,
-            "Normal": 2, 
-            "Pro": 4,
-            "Expert": 5
+            "Débutant": 1, "Normal": 2, "Pro": 4, "Expert": 5
         }
         
         mode = options["mode"]
-        who_starts = options["who_starts"]
-
-        # Conversion "Noir"/"Rouge" en "black"/"red"
-        who_starts_color = "black" if who_starts == "Noir" else "red"
+        who_starts_color = "black" if options["who_starts"] == "Noir" else "red"
         
-        # Instanciation des IA avec les bons niveaux
+        # Instanciation des IA en fonction du mode de jeu
         if mode == "Humain vs IA":
             depth = level_to_depth[options["red_level"]]
             self.ai_red = TeekoAI(self.game, "red", depth)
@@ -54,101 +77,105 @@ class App(tk.Tk):
             depth_red = level_to_depth[options["red_level"]]
             self.ai_black = TeekoAI(self.game, "black", depth_black)
             self.ai_red = TeekoAI(self.game, "red", depth_red)
-        elif mode == "Humain vs Humain":
-            pass
 
-        # Forcer le starter si différent de 'black'
-        if who_starts_color == "red" and self.game.get_current_player() != "red":
+        # Ajustement du joueur de départ si nécessaire
+        if who_starts_color != self.game.get_current_player():
             self.game.switch_player()
 
-        # Lancer l'écran de jeu
-        game_screen: GameScreen = self.screens["GameScreen"]
+        # Initialisation et affichage de l'écran de jeu
+        game_screen = self.screens["GameScreen"]
         game_screen.bind_runtime(self.game, self.ai_black, self.ai_red, options)
         self.show("GameScreen")
         game_screen.kickoff_if_ai()
 
 class StartScreen(tk.Frame):
+    """
+    Écran d'accueil et de configuration de la partie.
+    
+    Permet à l'utilisateur de choisir le mode de jeu, le niveau de difficulté 
+    des IA et le joueur qui commence la partie.
+    """
     def __init__(self, parent, app: App):
+        """
+        Initialise les widgets de l'écran de démarrage.
+
+        :param parent: Le conteneur parent (Frame).
+        :param app: L'instance principale de l'application App.
+        """
         super().__init__(parent, bg = "#FFEEE0")
         self.app = app
-        # Frame vide pour créer de l'espace en haut
+        
         tk.Frame(self, height=20, bg="#FFEEE0").pack()
-        tk.Label(self, text="Teeko - Choix du mode", font=("Helvetica", 16, "bold"), bg = "#FFEEE0").pack(pady=20)
+        tk.Label(self, text="Teeko - Choix du mode", font=("Helvetica", 16, "bold"), bg="#FFEEE0").pack(pady=20)
 
-        # Conteneur pour centrer tous les éléments
-        self.main_container = tk.Frame(self, bg = "#FFEEE0")
-        self.main_container.pack(pady = 20)
+        self.main_container = tk.Frame(self, bg="#FFEEE0")
+        self.main_container.pack(pady=20)
 
-        # Mode de jeu
+        # Widget pour le mode de jeu
         self.mode = tk.StringVar(value="Humain vs IA")
-        tk.Label(self, text="Mode de jeu", bg = "#FFEEE0", font=("Helvetica", 11, "bold")).pack()
+        tk.Label(self, text="Mode de jeu", bg="#FFEEE0", font=("Helvetica", 11, "bold")).pack()
         mode_menu = tk.OptionMenu(self, self.mode, "Humain vs IA", "IA vs IA", "Humain vs Humain")
         self.configure_option_menu(mode_menu)
         mode_menu.pack(pady=4)
 
-        # Qui commence
+        # Widget pour le joueur de départ
         self.who_starts = tk.StringVar(value="Noir")
-        tk.Label(self, text="Qui commence ?", bg = "#FFEEE0", font=("Helvetica", 11, "bold")).pack()
+        tk.Label(self, text="Qui commence ?", bg="#FFEEE0", font=("Helvetica", 11, "bold")).pack()
         who_menu = tk.OptionMenu(self, self.who_starts, "Noir", "Rouge")
         self.configure_option_menu(who_menu)
         who_menu.pack(pady=4)
 
-        # Niveaux IA avec les nouveaux choix
+        # Widgets pour le niveau des IA
         self.red_level = tk.StringVar(value="Normal")
         self.black_level = tk.StringVar(value="Normal")
         
-        # Frame pour IA Rouge
         self.red_frame = tk.Frame(self, bg = "#FFEEE0")
-        tk.Label(self.red_frame, text="Niveau IA rouge", bg = "#FFEEE0", font=("Helvetica", 11, "bold")).pack(side="left")
-        # Ajout des nouveaux niveaux
-        red_menu = tk.OptionMenu(self.red_frame, self.red_level, 
-                     "Débutant", "Normal", "Pro", "Expert")
+        tk.Label(self.red_frame, text="Niveau IA rouge", bg="#FFEEE0", font=("Helvetica", 11, "bold")).pack(side="left")
+        red_menu = tk.OptionMenu(self.red_frame, self.red_level, "Débutant", "Normal", "Pro", "Expert")
         self.configure_option_menu(red_menu)
         red_menu.pack(side="left")
         
-        # Frame pour IA Noire  
         self.black_frame = tk.Frame(self, bg = "#FFEEE0")
-        tk.Label(self.black_frame, text="Niveau IA noire", bg = "#FFEEE0",font=("Helvetica", 11, "bold")).pack(side="left")
-        black_menu = tk.OptionMenu(self.black_frame, self.black_level, 
-                     "Débutant", "Normal", "Pro", "Expert")
-        black_menu.pack(side="left")
+        tk.Label(self.black_frame, text="Niveau IA noire", bg="#FFEEE0", font=("Helvetica", 11, "bold")).pack(side="left")
+        black_menu = tk.OptionMenu(self.black_frame, self.black_level, "Débutant", "Normal", "Pro", "Expert")
         self.configure_option_menu(black_menu)
+        black_menu.pack(side="left")
 
-        # # Bouton en dernier
+        # Bouton de lancement
         self.launch_btn = tk.Button(self, text="Lancer la partie", command=self.launch,
                                    bg="#3E2D2D", fg="white", activebackground="#5A4444", 
                                    activeforeground="white", font=("Helvetica", 12, "bold"))
         self.launch_btn.pack(pady=16)
 
-        # Configuration initiale
         self.refresh_display()
         self.mode.trace_add("write", lambda *_: self.refresh_display())
 
     def configure_option_menu(self, menu):
-        """Configure complètement un OptionMenu."""
+        """
+        Applique un style uniforme aux widgets OptionMenu.
+
+        :param menu: Le widget OptionMenu à configurer.
+        :type menu: tk.OptionMenu
+        """
         menu.config(
-            bg="#3E2D2D", 
-            fg="white", 
-            activebackground="#5A4444", 
-            activeforeground="white",
-            width=12,  # Largeur fixe pour uniformité
-            font=("Helvetica", 10, "bold")
+            bg="#3E2D2D", fg="white", activebackground="#5A4444", 
+            activeforeground="white", width=12, font=("Helvetica", 10, "bold")
         )
-        
-        # Menu déroulant
         try:
+            # Configuration du menu déroulant lui-même
             dropdown = menu.nametowidget(menu.menuname)
             dropdown.config(
-                bg="#3E2D2D",
-                fg="white", 
-                activebackground="#5A4444",
-                activeforeground="white",
-                font=("Helvetica", 10, "bold")
+                bg="#3E2D2D", fg="white", activebackground="#5A4444",
+                activeforeground="white", font=("Helvetica", 10, "bold")
             )
-        except:
-            pass  # Si ça ne fonctionne pas, on ignore
+        except tk.TclError:
+            pass # Ignorer si le widget n'existe pas encore
 
     def refresh_display(self):
+        """
+        Affiche ou masque les menus de sélection de niveau d'IA en fonction
+        du mode de jeu sélectionné.
+        """
         self.red_frame.pack_forget()
         self.black_frame.pack_forget()
         
@@ -160,6 +187,10 @@ class StartScreen(tk.Frame):
             self.black_frame.pack(pady=8, before=self.launch_btn)
 
     def launch(self):
+        """
+        Récupère les options sélectionnées par l'utilisateur et demande
+        à l'application principale de lancer la partie.
+        """
         options = {
             "mode": self.mode.get(),
             "who_starts": self.who_starts.get(),
@@ -169,7 +200,20 @@ class StartScreen(tk.Frame):
         self.app.new_game(options)
 
 class GameScreen(tk.Frame):
+    """
+    Écran principal où se déroule la partie de Teeko.
+    
+    Cette classe gère l'affichage du plateau, les interactions de l'utilisateur,
+    le déroulement des tours de jeu (humain et IA) et l'affichage de l'état
+    de la partie.
+    """
     def __init__(self, parent, app: App):
+        """
+        Initialise les widgets de l'écran de jeu.
+
+        :param parent: Le conteneur parent (Frame).
+        :param app: L'instance principale de l'application App.
+        """
         super().__init__(parent, bg="#FFEEE0") 
         self.app = app
         self.game = None
@@ -177,25 +221,19 @@ class GameScreen(tk.Frame):
         self.ai_red = None
         self.options = None
         self.selected_from = None
-        self.aborted = False  # Flag d'arrêt
+        self.aborted = False
 
-        # Frame vide pour créer de l'espace en haut
         tk.Frame(self, height=20, bg="#FFEEE0").pack()
-
-        self.status = tk.Label(self, text="Prêt", font=("Helvetica", 14, "bold"), bg = "#FFEEE0")
+        self.status = tk.Label(self, text="Prêt", font=("Helvetica", 14, "bold"), bg="#FFEEE0")
         self.status.pack(pady=8)
-
         self.move_count_label = tk.Label(self, text="Coups joués : 0", font=("Helvetica", 11), bg="#FFEEE0")
         self.move_count_label.pack()
 
-        # Conteneur pour centrer le plateau
-        self.center_container = tk.Frame(self, bg = "#FFEEE0")
+        self.center_container = tk.Frame(self, bg="#FFEEE0")
         self.center_container.pack(expand=True, fill="both")
         
-        # Plateau centrée
         self.board_frame = tk.Frame(self.center_container, bg="#E7BB66")
         self.board_frame.pack(anchor="center", pady=30)
-
 
         self.buttons = []
         for i in range(5):
@@ -204,7 +242,7 @@ class GameScreen(tk.Frame):
                 b = tk.Button(self.board_frame, text="", width=5, height=2, font=("Helvetica", 14),
                               command=lambda r=i, c=j: self.on_click(r, c),
                               bg="#3E2D2D", fg="white", activebackground="#5A4444", relief="raised", bd=2)
-                b.grid(row=i, column=j, padx = 6, pady = 6)
+                b.grid(row=i, column=j, padx=6, pady=6)
                 row.append(b)
             self.buttons.append(row)
 
@@ -213,6 +251,16 @@ class GameScreen(tk.Frame):
                  activeforeground="white", font=("Helvetica", 12, "bold")).pack(pady=10)
 
     def bind_runtime(self, game, ai_black, ai_red, options):
+        """
+        Associe une instance de jeu active et ses joueurs à cet écran.
+
+        Cette méthode réinitialise l'état de l'écran pour une nouvelle partie.
+
+        :param game: L'instance du moteur de jeu TeekoGame.
+        :param ai_black: L'instance de l'IA pour le joueur noir, ou None.
+        :param ai_red: L'instance de l'IA pour le joueur rouge, ou None.
+        :param options: Le dictionnaire d'options de la partie.
+        """
         self.game = game
         self.ai_black = ai_black
         self.ai_red = ai_red
@@ -221,49 +269,57 @@ class GameScreen(tk.Frame):
         self.aborted = False
         self.move_count = 0
         
-        # Supprimer TOUS les boutons existants
         for widget in self.winfo_children():
             if isinstance(widget, tk.Button) or (isinstance(widget, tk.Frame) and any(isinstance(child, tk.Button) for child in widget.winfo_children())):
                 widget.destroy()
         
-        # Recréer le bouton Abandonner
         tk.Button(self, text="Abandonner", command=self.abort,
                 bg="#3E2D2D", fg="white", activebackground="#5A4444", 
                 activeforeground="white", font=("Helvetica", 12, "bold")).pack(pady=10)
         
         self.refresh()
 
-    #Au début de partie va regarder si c'est le tour d'une ia et la faire jouer si c'est le cas
     def kickoff_if_ai(self):
-        if self.aborted:
-            return
+        """
+        Déclenche le premier tour si c'est à une IA de commencer.
+        """
+        if self.aborted: return
         if self.game and not self.game.is_game_over():
             cur = self.game.get_current_player()
             if (cur == "black" and self.ai_black) or (cur == "red" and self.ai_red):
                 self.after(400, self.ai_turn)
 
     def on_click(self, r, c):
-        if self.game is None or self.game.is_game_over():
-            return
+        """
+        Gère les clics de l'utilisateur sur le plateau de jeu.
+
+        La méthode gère la logique de placement ('drop') et de déplacement ('move')
+        des pions pour un joueur humain.
+
+        :param r: L'indice de la ligne cliquée (0-4).
+        :type r: int
+        :param c: L'indice de la colonne cliquée (0-4).
+        :type c: int
+        """
+        if self.game is None or self.game.is_game_over(): return
+        
         cur = self.game.get_current_player()
-        # Bloquer si c'est au tour de l'IA
-        if (cur == "black" and self.ai_black) or (cur == "red" and self.ai_red):
-            return
+        is_ai_turn = (cur == "black" and self.ai_black) or (cur == "red" and self.ai_red)
+        if is_ai_turn: return
+
         pos = r * 5 + c
         if self.game.get_phase() == "drop":
             if self.game.drop_piece(pos):
-                # AFFICHER le coup humain
                 print(f"Humain ({cur}) a joué: ('drop', {pos + 1})")
                 self.post_move_flow()
-        else:  # phase move
+        else:
             if self.selected_from is None:
                 if self.game.get_board()[pos] == cur:
                     self.selected_from = pos
                     self.status.config(text="Choisis la case d'arrivée")
             else:
                 if self.game.move_piece(self.selected_from, pos):
-                    # AFFICHER le coup humain
-                    print(f"Humain ({cur}) a joué: ('move', {self.selected_from}, {pos + 1})")
+                    print(f"Humain ({cur}) a joué: ('move', {self.selected_from + 1}, {pos + 1})")
                     self.selected_from = None
                     self.post_move_flow()
                 else:
@@ -271,11 +327,14 @@ class GameScreen(tk.Frame):
                     self.selected_from = None
         self.refresh()
         
-    #Verifie si c'est au tour d'une ia de jouer après un coup humain
     def post_move_flow(self):
+        """
+        Exécute la logique post-coup (mise à jour du compteur, vérification
+        de fin de partie, passage de main à l'IA).
+        """
         self.move_count += 1
-        if self.aborted:
-            return
+        if self.aborted: return
+        
         if self.game.get_winner():
             self.finish()
         else:
@@ -284,8 +343,13 @@ class GameScreen(tk.Frame):
                 self.after(400, self.ai_turn)
 
     def ai_turn(self):
-        if self.aborted or self.game is None or self.game.is_game_over():
-            return
+        """
+        Exécute le tour de jeu pour une IA. 
+        
+        Identifie l'IA active, lui demande de jouer son coup, met à jour l'interface
+        et gère la suite de la partie.
+        """
+        if self.aborted or self.game is None or self.game.is_game_over(): return
         
         cur = self.game.get_current_player()
         ai = self.ai_red if cur == "red" else self.ai_black
@@ -296,27 +360,28 @@ class GameScreen(tk.Frame):
             self.refresh()
             if self.game.get_winner():
                 self.finish()
-            elif not self.game.is_game_over() and not self.aborted:
+            elif not self.aborted:
                 next_player = self.game.get_current_player()
-                if (next_player == "black" and self.ai_black) or (next_player == "red" and self.ai_red):
+                is_next_player_ai = (next_player == "black" and self.ai_black) or \
+                                    (next_player == "red" and self.ai_red)
+                if is_next_player_ai:
                     self.after(400, self.ai_turn)
 
     def finish(self):
-        winner = self.game.get_winner()
+        """
+        Gère la fin de la partie. 
         
-        # Afficher le message de victoire dans l'interface
+        Affiche le gagnant et propose les options "Rejouer" ou "Quitter".
+        """
+        winner = self.game.get_winner()
         nom = {"black": "Noir", "red": "Rouge"}.get(winner, str(winner))
         self.status.config(text=f"Partie terminée ! Gagnant : {nom}")
         
-        # APPELER print_winner_info pour afficher dans la console
         self.print_winner_info(winner)
         
-        # Supprimer TOUS les boutons existants
         for widget in self.winfo_children():
-            if isinstance(widget, tk.Button):
-                widget.destroy()
+            if isinstance(widget, tk.Button): widget.destroy()
         
-        # Créer les boutons de fin (uniquement en fin de partie)
         button_frame = tk.Frame(self, bg="#FFEEE0")
         button_frame.pack(pady=10)
         
@@ -331,60 +396,60 @@ class GameScreen(tk.Frame):
         self.refresh()
 
     def print_winner_info(self, winner):
-        """Affiche dans la console le gagnant et la position des pions gagnants."""
+        """
+        Affiche des informations détaillées sur la victoire dans la console.
+
+        :param winner: La couleur du joueur gagnant.
+        :type winner: str
+        """
         print("=" * 50)
         print(f"PARTIE TERMINÉE - GAGNANT : {winner.upper()}")
         print("=" * 50)
         
         board = self.game.get_board()
-        win_patterns = self.game.win_patterns
-        
-        # Trouver le motif gagnant
         winning_pattern = None
-        for pattern in win_patterns:
+        for pattern in self.game.win_patterns:
             if all(board[pos] == winner for pos in pattern):
                 winning_pattern = pattern
                 break
         
         if winning_pattern:
             print(f"Motif gagnant ({winner}) :")
-            # Afficher les coordonnées des pions gagnants
             for pos in winning_pattern:
                 row, col = divmod(pos, 5)
                 print(f"  - Position {pos + 1} → Ligne {row + 1}, Colonne {col + 1}")
         else:
             print("Erreur : Impossible de trouver le motif gagnant")
-        
         print("=" * 50)
 
     def replay(self):
-        """Retourne au menu principal pour choisir une nouvelle configuration."""
+        """
+        Retourne à l'écran d'accueil pour une nouvelle partie.
+        """
         self.app.show("StartScreen")
 
     def abort(self):
-        """Arrête la partie et retourne au menu."""
+        """
+        Interrompt la partie en cours et retourne à l'écran d'accueil.
+        """
         print("Partie abandonnée")
-        # Arrêter toutes les IA en cours
         self.aborted = True
-        self.game = None
-        self.ai_black = None
-        self.ai_red = None
-        self.options = None
-        
-        # Retour au menu de départ
+        self.game = self.ai_black = self.ai_red = self.options = None
         self.app.show("StartScreen")
 
     def refresh(self):
+        """
+        Met à jour l'intégralité de l'interface graphique (plateau, labels)
+        pour refléter l'état actuel du jeu.
+        """
         board = self.game.get_board() if self.game else [None]*25
         for i in range(5):
             for j in range(5):
-                v = board[i*5 + j]
-                if v == "black":
-                    self.buttons[i][j].config(text="⬤", fg="black", bg="#5A4444")
-                elif v == "red":
-                    self.buttons[i][j].config(text="⬤", fg="red", bg="#5A4444")
-                else:
-                    self.buttons[i][j].config(text="", bg="#5A4444")
+                piece = board[i*5 + j]
+                color = "black" if piece == "black" else "red"
+                text = "⬤" if piece else ""
+                self.buttons[i][j].config(text=text, fg=color, bg="#5A4444")
+
         if self.game and not self.game.is_game_over():
             cur = self.game.get_current_player()
             if (cur == "black" and self.ai_black) or (cur == "red" and self.ai_red):
